@@ -60,13 +60,14 @@ const complaintSchema = new mongoose.Schema(
     ],
     status: {
       type: String,
-      enum: ["Open", "Under Review", "Resolved", "Pending", "In Progress"],
-      default: "Open"
+      enum: ["Pending", "Assigned", "Accepted", "Rejected", "Resolved", "Completed", "Open", "Under Review", "In Progress"],
+      default: "Pending"
     }
   },
   { timestamps: true }
 );
 
 complaintSchema.index({ building: 1, status: 1, createdAt: -1 });
+complaintSchema.index({ building: 1, tenant: 1, createdAt: -1 });
 
 module.exports = mongoose.models.Complaint || mongoose.model("Complaint", complaintSchema);

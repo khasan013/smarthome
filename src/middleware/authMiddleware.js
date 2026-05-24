@@ -4,7 +4,7 @@ const asyncHandler = require("./asyncHandler");
 
 const protect = asyncHandler(async (req, res, next) => {
   const authHeader = req.headers.authorization || "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : req.query.token || null;
 
   if (!token) {
     res.status(401);

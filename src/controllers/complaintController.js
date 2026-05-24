@@ -3,6 +3,17 @@ const Notification = require("../models/Notification");
 const asyncHandler = require("../middleware/asyncHandler");
 const { serializeComplaint } = require("../utils/serializers");
 
+const CLOSED_STATUSES = ["Resolved", "Rejected", "Completed"];
+const STATUS_ALIASES = {
+  Open: "Pending",
+  "Under Review": "Assigned",
+  "In Progress": "Assigned"
+};
+
+function normalizeStatus(status) {
+  return STATUS_ALIASES[status] || status || "Pending";
+}
+
 const listComplaints = asyncHandler(async (req, res) => {
   const query = { building: req.user.building };
 
@@ -11,7 +22,12 @@ const listComplaints = asyncHandler(async (req, res) => {
   }
 
   const complaints = await Complaint.find(query).populate("tenant").sort({ createdAt: -1 });
-  res.json({ success: true, complaints: complaints.map(serializeComplaint) });
+  const serialized = complaints.map(serializeComplaint);
+  res.json({
+    success: true,
+    complaints: req.user.role === "admin" ? serialized.filter((item) => !CLOSED_STATUSES.includes(item.status)) : serialized,
+    resolvedHistory: serialized.filter((item) => CLOSED_STATUSES.includes(item.status))
+  });
 });
 
 const createComplaint = asyncHandler(async (req, res) => {
@@ -32,8 +48,8 @@ const createComplaint = asyncHandler(async (req, res) => {
     message,
     priority: priority || "Medium",
     photoUrl: photoUrl || "",
-    status: req.body.status || "Open",
-    timeline: [{ status: "Open", comment: "Complaint submitted" }]
+    status: normalizeStatus(req.body.status),
+    timeline: [{ status: "Pending", comment: "Complaint submitted" }]
   });
 
   await Notification.create({
@@ -58,7 +74,7 @@ const updateComplaint = asyncHandler(async (req, res) => {
   }
 
   if (req.body.status !== undefined) {
-    complaint.status = req.body.status;
+    complaint.status = normalizeStatus(req.body.status);
   }
   if (req.body.adminComment !== undefined) complaint.adminComment = req.body.adminComment;
   if (req.body.assignedAction !== undefined) complaint.assignedAction = req.body.assignedAction;

@@ -1,6 +1,7 @@
 const Bill = require("../models/Bill");
 const Notification = require("../models/Notification");
 const User = require("../models/User");
+const Building = require("../models/Building");
 const asyncHandler = require("../middleware/asyncHandler");
 const { serializeBill } = require("../utils/serializers");
 
@@ -142,6 +143,42 @@ const updateBill = asyncHandler(async (req, res) => {
   res.json({ success: true, bill: serializeBill(bill) });
 });
 
+function escapePdfText(value) {
+  return String(value ?? "").replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+}
+
+function createSimplePdf(lines) {
+  const content = [
+    "BT",
+    "/F1 20 Tf",
+    "50 790 Td",
+    `(${escapePdfText(lines[0])}) Tj`,
+    "/F1 11 Tf",
+    ...lines.slice(1).flatMap((line) => ["0 -22 Td", `(${escapePdfText(line)}) Tj`]),
+    "ET"
+  ].join("\n");
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    `<< /Length ${Buffer.byteLength(content)} >>\nstream\n${content}\nendstream`
+  ];
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+  objects.forEach((object, index) => {
+    offsets.push(Buffer.byteLength(pdf));
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const xref = Buffer.byteLength(pdf);
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  offsets.slice(1).forEach((offset) => {
+    pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  });
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  return Buffer.from(pdf);
+}
+
 const downloadBill = asyncHandler(async (req, res) => {
   const query = { _id: req.params.id, building: req.user.building };
   if (req.user.role !== "admin") query.tenant = req.user._id;
@@ -154,25 +191,27 @@ const downloadBill = asyncHandler(async (req, res) => {
 
   const total =
     bill.rent + bill.serviceCharge + bill.electricity + bill.gas + bill.water + bill.otherCosts;
-  const html = `
-Smart Building Manager Invoice
-Invoice: ${bill.invoiceId || bill._id}
-Flat: ${bill.flatNo}
-Resident: ${bill.tenant ? bill.tenant.name : ""}
-Month: ${bill.month}
-Rent: ${bill.rent}
-Electricity: ${bill.electricity}
-Gas: ${bill.gas}
-Water: ${bill.water}
-Service charge: ${bill.serviceCharge}
-Other costs: ${bill.otherCosts}
-Total: ${total}
-Status: ${bill.status}
-QR: ${bill.invoiceId || bill._id}
-`;
+  const building = await Building.findById(req.user.building);
+  const pdf = createSimplePdf([
+    "Smart Building Manager Invoice",
+    `Building: ${building ? building.name : ""}`,
+    `Invoice ID: ${bill.invoiceId || bill._id}`,
+    `Resident: ${bill.tenant ? bill.tenant.name : ""}`,
+    `Flat: ${bill.flatNo}`,
+    `Month: ${bill.month}`,
+    `Rent: Tk ${bill.rent}`,
+    `Electricity: Tk ${bill.electricity}`,
+    `Water: Tk ${bill.water}`,
+    `Gas: Tk ${bill.gas}`,
+    `Service charge: Tk ${bill.serviceCharge}`,
+    `Other costs: Tk ${bill.otherCosts}`,
+    `Total: Tk ${total}`,
+    `Status: ${bill.status}`,
+    `QR: ${bill.invoiceId || bill._id}`
+  ]);
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", `attachment; filename="${bill.invoiceId || bill._id}.pdf"`);
-  res.send(Buffer.from(html));
+  res.send(pdf);
 });
 
 module.exports = { listBills, createBill, updateBill, downloadBill };
