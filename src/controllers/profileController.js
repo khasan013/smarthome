@@ -21,7 +21,7 @@ const updateProfile = asyncHandler(async (req, res) => {
   res.json({
     success: true,
     user: serializeUser(req.user),
-    building: serializeBuilding(building)
+    building: serializeBuilding(await Building.findById(req.user.building).populate("admin"))
   });
 });
 

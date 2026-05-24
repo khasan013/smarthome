@@ -147,12 +147,12 @@ const login = asyncHandler(async (req, res) => {
     throw new Error(user.status === "rejected" ? "Your access request was rejected" : "Your account is waiting for admin approval");
   }
 
-  const building = await Building.findById(user.building);
+  const building = await Building.findById(user.building).populate("admin");
   authResponse(res, user, building);
 });
 
 const me = asyncHandler(async (req, res) => {
-  const building = await Building.findById(req.user.building);
+  const building = await Building.findById(req.user.building).populate("admin");
   res.json({
     success: true,
     user: serializeUser(req.user),

@@ -19,10 +19,13 @@ function serializeUser(user) {
 }
 
 function serializeBuilding(building) {
+  const admin = building.admin && typeof building.admin === "object" ? building.admin : null;
   return {
     id: toId(building._id),
     name: building.name,
     code: building.code,
+    adminPhone: admin && admin.phone ? admin.phone : "",
+    adminName: admin && admin.name ? admin.name : "",
     emergencyContact: building.emergencyContact || "",
     securityGuard: building.securityGuard || "",
     electrician: building.electrician || "",
