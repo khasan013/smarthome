@@ -41,7 +41,7 @@ const userSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["Active", "Inactive"],
+      enum: ["Pending", "Active", "Inactive"],
       default: "Active"
     }
   },

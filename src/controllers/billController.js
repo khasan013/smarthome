@@ -50,16 +50,28 @@ const createBill = asyncHandler(async (req, res) => {
     throw new Error("Bill month is required");
   }
 
-  const bill = await Bill.create({
-    building: req.user.building,
-    tenant: tenant._id,
-    flatNo: tenant.flatNo,
-    month,
-    rent: Number(req.body.rent ?? tenant.rent ?? 0),
-    serviceCharge: Number(req.body.serviceCharge || 0),
-    status: req.body.status || "Unpaid",
-    dueDate: req.body.dueDate
-  });
+  const bill = await Bill.findOneAndUpdate(
+    {
+      building: req.user.building,
+      tenant: tenant._id,
+      month
+    },
+    {
+      building: req.user.building,
+      tenant: tenant._id,
+      flatNo: tenant.flatNo,
+      month,
+      rent: Number(req.body.rent ?? tenant.rent ?? 0),
+      serviceCharge: Number(req.body.serviceCharge || 0),
+      status: req.body.status || "Unpaid",
+      dueDate: req.body.dueDate
+    },
+    {
+      new: true,
+      upsert: true,
+      setDefaultsOnInsert: true
+    }
+  );
 
   res.status(201).json({ success: true, bill: serializeBill(bill) });
 });

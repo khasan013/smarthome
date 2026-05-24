@@ -92,7 +92,7 @@ const registerUser = asyncHandler(async (req, res) => {
     password,
     role: "tenant",
     building: building._id,
-    status: "Active"
+    status: "Pending"
   });
 
   authResponse(res, user, building, 201);
