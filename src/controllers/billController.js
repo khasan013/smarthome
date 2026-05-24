@@ -1,4 +1,5 @@
 const Bill = require("../models/Bill");
+const Notification = require("../models/Notification");
 const User = require("../models/User");
 const asyncHandler = require("../middleware/asyncHandler");
 const { serializeBill } = require("../utils/serializers");
@@ -63,7 +64,12 @@ const createBill = asyncHandler(async (req, res) => {
       month,
       rent: Number(req.body.rent ?? tenant.rent ?? 0),
       serviceCharge: Number(req.body.serviceCharge || 0),
-      status: req.body.status || "Unpaid",
+      electricity: Number(req.body.electricity || 0),
+      gas: Number(req.body.gas || 0),
+      water: Number(req.body.water || 0),
+      otherCosts: Number(req.body.otherCosts || 0),
+      invoiceId: req.body.invoiceId || `INV-${tenant.flatNo}-${month}`.replace(/\s+/g, "-").toUpperCase(),
+      status: req.body.status || "UNPAID",
       dueDate: req.body.dueDate
     },
     {
@@ -72,6 +78,14 @@ const createBill = asyncHandler(async (req, res) => {
       setDefaultsOnInsert: true
     }
   );
+
+  await Notification.create({
+    building: req.user.building,
+    user: tenant._id,
+    title: "Bill generated",
+    message: `${month} bill is ready for flat ${tenant.flatNo}.`,
+    type: "bill"
+  });
 
   res.status(201).json({ success: true, bill: serializeBill(bill) });
 });
@@ -107,12 +121,58 @@ const updateBill = asyncHandler(async (req, res) => {
   }
 
   if (req.body.status === "Paid") {
-    bill.status = "Paid";
+    bill.status = "PAID";
+    bill.paidAt = new Date();
+  } else if (req.body.status === "PAID") {
+    bill.status = "PAID";
     bill.paidAt = new Date();
   }
 
   await bill.save();
+
+  if (bill.status === "PAID") {
+    await Notification.create({
+      building: req.user.building,
+      user: bill.tenant,
+      title: "Payment received",
+      message: `${bill.month} bill marked as paid.`,
+      type: "payment"
+    });
+  }
   res.json({ success: true, bill: serializeBill(bill) });
 });
 
-module.exports = { listBills, createBill, updateBill };
+const downloadBill = asyncHandler(async (req, res) => {
+  const query = { _id: req.params.id, building: req.user.building };
+  if (req.user.role !== "admin") query.tenant = req.user._id;
+
+  const bill = await Bill.findOne(query).populate("tenant");
+  if (!bill) {
+    res.status(404);
+    throw new Error("Bill was not found");
+  }
+
+  const total =
+    bill.rent + bill.serviceCharge + bill.electricity + bill.gas + bill.water + bill.otherCosts;
+  const html = `
+Smart Building Manager Invoice
+Invoice: ${bill.invoiceId || bill._id}
+Flat: ${bill.flatNo}
+Resident: ${bill.tenant ? bill.tenant.name : ""}
+Month: ${bill.month}
+Rent: ${bill.rent}
+Electricity: ${bill.electricity}
+Gas: ${bill.gas}
+Water: ${bill.water}
+Service charge: ${bill.serviceCharge}
+Other costs: ${bill.otherCosts}
+Total: ${total}
+Status: ${bill.status}
+QR: ${bill.invoiceId || bill._id}
+`;
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="${bill.invoiceId || bill._id}.pdf"`);
+  res.send(Buffer.from(html));
+});
+
+module.exports = { listBills, createBill, updateBill, downloadBill };

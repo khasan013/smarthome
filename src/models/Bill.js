@@ -32,10 +32,34 @@ const billSchema = new mongoose.Schema(
       default: 0,
       min: 0
     },
+    electricity: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    gas: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    water: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    otherCosts: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    invoiceId: {
+      type: String,
+      default: ""
+    },
     status: {
       type: String,
-      enum: ["Paid", "Unpaid", "Overdue"],
-      default: "Unpaid"
+      enum: ["PAID", "UNPAID", "Paid", "Unpaid", "Overdue"],
+      default: "UNPAID"
     },
     dueDate: {
       type: Date

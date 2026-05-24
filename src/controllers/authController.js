@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const Building = require("../models/Building");
+const Notification = require("../models/Notification");
 const User = require("../models/User");
 const asyncHandler = require("../middleware/asyncHandler");
 const { signToken } = require("../utils/tokens");
@@ -25,7 +26,7 @@ function authResponse(res, user, building, statusCode = 200) {
 
 const registerAdmin = asyncHandler(async (req, res) => {
   const name = req.body.name || req.body.adminName;
-  const { phone, buildingName, password } = req.body;
+  const { phone, email, buildingName, password } = req.body;
 
   if (!name || !phone || !buildingName || !password) {
     res.status(400);
@@ -47,10 +48,11 @@ const registerAdmin = asyncHandler(async (req, res) => {
   const user = await User.create({
     name,
     phone,
+    email,
     password,
     role: "admin",
     building: building._id,
-    status: "Active"
+    status: "approved"
   });
 
   building.admin = user._id;
@@ -60,12 +62,12 @@ const registerAdmin = asyncHandler(async (req, res) => {
 });
 
 const registerUser = asyncHandler(async (req, res) => {
-  const { name, phone, flatNo, buildingCode, password } = req.body;
+  const { name, phone, email, flatNo, buildingCode, password } = req.body;
   const rent = Number(req.body.rent || 0);
 
-  if (!name || !phone || !flatNo || !buildingCode || !password) {
+  if (!name || !phone || !email || !flatNo || !buildingCode || !password) {
     res.status(400);
-    throw new Error("Name, phone, flat number, building code and password are required");
+    throw new Error("Name, phone, email, flat number, house code and password are required");
   }
 
   const building = await Building.findOne({ code: buildingCode.toUpperCase().trim() });
@@ -76,7 +78,7 @@ const registerUser = asyncHandler(async (req, res) => {
 
   const duplicate = await User.findOne({
     building: building._id,
-    $or: [{ phone }, { flatNo }]
+    $or: [{ phone }, { email: email.toLowerCase() }, { flatNo }]
   });
 
   if (duplicate) {
@@ -87,15 +89,29 @@ const registerUser = asyncHandler(async (req, res) => {
   const user = await User.create({
     name,
     phone,
+    email,
     flatNo,
     rent,
     password,
     role: "tenant",
     building: building._id,
-    status: "Pending"
+    status: "pending"
   });
 
-  authResponse(res, user, building, 201);
+  await Notification.create({
+    building: building._id,
+    user: building.admin,
+    title: "New resident requested access",
+    message: `${name} from flat ${flatNo} is waiting for approval.`,
+    type: "approval"
+  });
+
+  res.status(201).json({
+    success: true,
+    message: "Registration submitted. Please wait for admin approval.",
+    user: serializeUser(user),
+    building: serializeBuilding(building)
+  });
 });
 
 const login = asyncHandler(async (req, res) => {
@@ -124,6 +140,11 @@ const login = asyncHandler(async (req, res) => {
   if (!user || !(await user.matchPassword(password))) {
     res.status(401);
     throw new Error("Invalid login credentials");
+  }
+
+  if (user.role === "tenant" && user.status !== "approved" && user.status !== "Active") {
+    res.status(403);
+    throw new Error(user.status === "rejected" ? "Your access request was rejected" : "Your account is waiting for admin approval");
   }
 
   const building = await Building.findById(user.building);

@@ -13,6 +13,12 @@ const userSchema = new mongoose.Schema(
       required: true,
       trim: true
     },
+    email: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: ""
+    },
     password: {
       type: String,
       required: true,
@@ -41,14 +47,25 @@ const userSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["Pending", "Active", "Inactive"],
+      enum: ["pending", "approved", "rejected", "Active", "Pending", "Inactive"],
       default: "Active"
+    },
+    profilePhoto: {
+      type: String,
+      default: ""
     }
   },
   { timestamps: true }
 );
 
 userSchema.index({ phone: 1, building: 1 }, { unique: true });
+userSchema.index(
+  { email: 1, building: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { email: { $type: "string", $gt: "" } }
+  }
+);
 userSchema.index(
   { flatNo: 1, building: 1 },
   {

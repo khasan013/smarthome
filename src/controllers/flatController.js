@@ -1,4 +1,5 @@
 const User = require("../models/User");
+const Notification = require("../models/Notification");
 const asyncHandler = require("../middleware/asyncHandler");
 const { serializeFlat } = require("../utils/serializers");
 
@@ -29,12 +30,13 @@ const createFlat = asyncHandler(async (req, res) => {
   const flat = await User.create({
     name,
     phone,
+    email: req.body.email,
     flatNo,
     rent,
     password,
     role: "tenant",
     building: req.user.building,
-    status: req.body.status || "Active"
+    status: req.body.status || "approved"
   });
 
   res.status(201).json({ success: true, flat: serializeFlat(flat) });
@@ -63,6 +65,26 @@ const updateFlat = asyncHandler(async (req, res) => {
   }
 
   await flat.save();
+
+  if (req.body.status === "approved" || req.body.status === "Active") {
+    await Notification.create({
+      building: req.user.building,
+      user: flat._id,
+      title: "Approval accepted",
+      message: "Your resident account has been approved.",
+      type: "approval"
+    });
+  }
+  if (req.body.status === "rejected") {
+    await Notification.create({
+      building: req.user.building,
+      user: flat._id,
+      title: "Approval rejected",
+      message: "Your resident access request was rejected.",
+      type: "approval"
+    });
+  }
+
   res.json({ success: true, flat: serializeFlat(flat) });
 });
 

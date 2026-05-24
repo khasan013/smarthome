@@ -1,4 +1,5 @@
 const Complaint = require("../models/Complaint");
+const Notification = require("../models/Notification");
 const asyncHandler = require("../middleware/asyncHandler");
 const { serializeComplaint } = require("../utils/serializers");
 
@@ -9,12 +10,12 @@ const listComplaints = asyncHandler(async (req, res) => {
     query.tenant = req.user._id;
   }
 
-  const complaints = await Complaint.find(query).sort({ createdAt: -1 });
+  const complaints = await Complaint.find(query).populate("tenant").sort({ createdAt: -1 });
   res.json({ success: true, complaints: complaints.map(serializeComplaint) });
 });
 
 const createComplaint = asyncHandler(async (req, res) => {
-  const { category, message } = req.body;
+  const { category, message, title, priority, photoUrl } = req.body;
   const flatNo = req.body.flatNo || req.user.flatNo;
 
   if (!flatNo || !category || !message) {
@@ -27,8 +28,19 @@ const createComplaint = asyncHandler(async (req, res) => {
     tenant: req.user.role === "tenant" ? req.user._id : req.body.tenant,
     flatNo,
     category,
+    title: title || category,
     message,
-    status: req.body.status || "Pending"
+    priority: priority || "Medium",
+    photoUrl: photoUrl || "",
+    status: req.body.status || "Open",
+    timeline: [{ status: "Open", comment: "Complaint submitted" }]
+  });
+
+  await Notification.create({
+    building: req.user.building,
+    title: "New complaint submitted",
+    message: `${flatNo}: ${title || category}`,
+    type: "complaint"
   });
 
   res.status(201).json({ success: true, complaint: serializeComplaint(complaint) });
@@ -48,8 +60,24 @@ const updateComplaint = asyncHandler(async (req, res) => {
   if (req.body.status !== undefined) {
     complaint.status = req.body.status;
   }
+  if (req.body.adminComment !== undefined) complaint.adminComment = req.body.adminComment;
+  if (req.body.assignedAction !== undefined) complaint.assignedAction = req.body.assignedAction;
+  complaint.timeline.push({
+    status: complaint.status,
+    comment: req.body.adminComment || req.body.assignedAction || "Complaint updated"
+  });
 
   await complaint.save();
+
+  if (complaint.tenant) {
+    await Notification.create({
+      building: req.user.building,
+      user: complaint.tenant,
+      title: "Complaint updated",
+      message: `${complaint.title || complaint.category} is now ${complaint.status}.`,
+      type: "complaint"
+    });
+  }
   res.json({ success: true, complaint: serializeComplaint(complaint) });
 });
 
