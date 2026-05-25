@@ -96,6 +96,21 @@ function table(cmds, rows, x, y, w) {
   return y - 48 - rows.length * 28;
 }
 
+function compactTable(cmds, title, rows, x, y, w) {
+  text(cmds, title, x, y, 12, true, "0.04 0.05 0.05");
+  rect(cmds, x, y - 26, w, 22, "0.08 0.09 0.08");
+  text(cmds, "Flat / Resident", x + 10, y - 18, 8, true, "1 1 1");
+  text(cmds, "Amount", x + w - 64, y - 18, 8, true, "1 1 1");
+  const safeRows = rows.length ? rows : [{ flatNo: "-", resident: "No records", amount: 0 }];
+  safeRows.slice(0, 8).forEach((row, index) => {
+    const rowY = y - 48 - index * 20;
+    rect(cmds, x, rowY, w, 20, index % 2 === 0 ? "0.99 0.99 0.98" : "0.94 0.95 0.93");
+    const label = `${row.flatNo || "-"} / ${row.resident || "Resident"}`.slice(0, 34);
+    text(cmds, label, x + 10, rowY + 7, 8, false, "0.12 0.13 0.12");
+    text(cmds, money(row.amount), x + w - 64, rowY + 7, 8, true, "0.12 0.13 0.12");
+  });
+}
+
 function createInvoicePdf({ buildingName, invoiceId, residentName, flatNo, meterNumber, month, rows, total, status }) {
   const cmds = [];
   header(cmds, "Smart Building Manager Invoice", `Invoice ${invoiceId}`, status);
@@ -120,26 +135,56 @@ function createInvoicePdf({ buildingName, invoiceId, residentName, flatNo, meter
   return buildPdf(cmds);
 }
 
-function createReportPdf({ title, collected, pending, paidUsers, unpaidUsers, billsCount, residents, generatedAt }) {
+function createReportPdf({
+  title,
+  buildingName,
+  houseCode,
+  adminName,
+  adminPhone,
+  ownerName,
+  ownerPhone,
+  month,
+  collected,
+  pending,
+  paidUsers,
+  unpaidUsers,
+  billsCount,
+  residents,
+  paidRows = [],
+  unpaidRows = [],
+  generatedAt
+}) {
   const cmds = [];
-  header(cmds, title || "Smart Building Monthly Report", "Premium monthly financial summary", "REPORT");
-  summaryCard(cmds, "Collected", money(collected), 36, 668);
-  summaryCard(cmds, "Pending", money(pending), 216, 668);
-  summaryCard(cmds, "Residents", String(residents || 0), 396, 668);
+  header(cmds, title || "Smart Building Monthly Report", `${buildingName || "Smart Building"} / House ${houseCode || "-"} / ${month || ""}`, "REPORT");
+  text(cmds, buildingName || "Smart Building", 36, 726, 18, true, "0.04 0.05 0.05");
+  text(cmds, `House code: ${houseCode || "-"}    Admin: ${adminName || "-"}    Month: ${month || "-"}`, 36, 706, 10, false, "0.28 0.30 0.28");
+  summaryCard(cmds, "Collected", money(collected), 36, 636);
+  summaryCard(cmds, "Pending", money(pending), 216, 636);
+  summaryCard(cmds, "Residents", String(residents || 0), 396, 636);
   const rows = [
     ["Paid users", String(paidUsers || 0)],
     ["Unpaid users", String(unpaidUsers || 0)],
     ["Bills count", String(billsCount || 0)],
-    ["Generated", generatedAt || new Date().toISOString()]
+    ["Total collection", money(collected)],
+    ["Generated", String(generatedAt || new Date().toISOString()).slice(0, 19)]
   ];
-  table(cmds, rows, 36, 608, 504);
-  rect(cmds, 36, 320, 504, 86, "0.05 0.06 0.06");
-  text(cmds, "Executive summary", 58, 374, 16, true, "1 1 1");
-  text(cmds, "Use this report for monthly reconciliation, tenant follow-up, and building revenue tracking.", 58, 350, 10, false, "0.78 0.78 0.78");
-  line(cmds, 36, 112, 190, 112);
-  line(cmds, 386, 112, 540, 112);
-  text(cmds, "Prepared by", 78, 92, 9, false, "0.34 0.36 0.34");
-  text(cmds, "Approved by", 428, 92, 9, false, "0.34 0.36 0.34");
+  table(cmds, rows, 36, 576, 504);
+  compactTable(cmds, "Paid users", paidRows, 36, 378, 240);
+  compactTable(cmds, "Unpaid users", unpaidRows, 300, 378, 240);
+  rect(cmds, 36, 142, 504, 54, "0.05 0.06 0.06");
+  text(cmds, "Financial summary", 58, 174, 14, true, "1 1 1");
+  text(cmds, `Collected ${money(collected)} and pending ${money(pending)} for ${residents || 0} residents.`, 58, 154, 9, false, "0.78 0.78 0.78");
+  line(cmds, 36, 92, 210, 92);
+  line(cmds, 342, 92, 540, 92);
+  text(cmds, "Prepared by", 36, 112, 9, true, "0.04 0.05 0.05");
+  text(cmds, adminName || "-", 36, 72, 10, false, "0.18 0.20 0.18");
+  text(cmds, adminPhone || "-", 36, 58, 9, false, "0.34 0.36 0.34");
+  text(cmds, String(generatedAt || new Date().toISOString()).slice(0, 10), 36, 44, 9, false, "0.34 0.36 0.34");
+  text(cmds, "Approved by", 342, 112, 9, true, "0.04 0.05 0.05");
+  text(cmds, ownerName || "-", 342, 72, 10, false, "0.18 0.20 0.18");
+  text(cmds, ownerPhone || "-", 342, 58, 9, false, "0.34 0.36 0.34");
+  text(cmds, "Signature", 450, 44, 9, false, "0.34 0.36 0.34");
+  text(cmds, "Generated digitally by Smart Building Manager", 36, 20, 8, false, "0.45 0.45 0.45");
   return buildPdf(cmds);
 }
 

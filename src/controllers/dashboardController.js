@@ -6,6 +6,7 @@ const Facility = require("../models/Facility");
 const Booking = require("../models/Booking");
 const VisitorRequest = require("../models/VisitorRequest");
 const User = require("../models/User");
+const Building = require("../models/Building");
 const asyncHandler = require("../middleware/asyncHandler");
 const { createReportPdf } = require("../utils/premiumPdf");
 const {
@@ -104,9 +105,10 @@ const getDashboard = asyncHandler(async (req, res) => {
 
 const downloadMonthlyReport = asyncHandler(async (req, res) => {
   const building = req.user.building;
-  const [flats, bills] = await Promise.all([
+  const [buildingDoc, flats, bills] = await Promise.all([
+    Building.findById(building).populate("admin"),
     User.find({ building, role: "tenant" }),
-    Bill.find({ building }).sort({ createdAt: -1 })
+    Bill.find({ building }).populate("tenant").sort({ createdAt: -1 })
   ]);
   const paidBills = bills.filter(isPaid);
   const unpaidBills = bills.filter((bill) => !isPaid(bill));
@@ -114,12 +116,29 @@ const downloadMonthlyReport = asyncHandler(async (req, res) => {
   const pending = unpaidBills.reduce((sum, bill) => sum + billTotal(bill), 0);
   const pdf = createReportPdf({
     title: "Smart Building Monthly Report",
+    buildingName: buildingDoc?.name,
+    houseCode: buildingDoc?.code,
+    adminName: req.user.name,
+    adminPhone: req.user.phone,
+    ownerName: buildingDoc?.admin?.name || req.user.name,
+    ownerPhone: buildingDoc?.admin?.phone || req.user.phone,
+    month: req.query.month || new Date().toLocaleString("en-US", { month: "long", year: "numeric" }),
     collected,
     pending,
     paidUsers: new Set(paidBills.map((bill) => bill.tenant.toString())).size,
     unpaidUsers: new Set(unpaidBills.map((bill) => bill.tenant.toString())).size,
     billsCount: bills.length,
     residents: flats.length,
+    paidRows: paidBills.slice(0, 8).map((bill) => ({
+      flatNo: bill.flatNo,
+      resident: bill.tenant?.name,
+      amount: billTotal(bill)
+    })),
+    unpaidRows: unpaidBills.slice(0, 8).map((bill) => ({
+      flatNo: bill.flatNo,
+      resident: bill.tenant?.name,
+      amount: billTotal(bill)
+    })),
     generatedAt: new Date().toISOString()
   });
   res.setHeader("Content-Type", "application/pdf");

@@ -3,7 +3,7 @@ const Building = require("../models/Building");
 const Notification = require("../models/Notification");
 const User = require("../models/User");
 const asyncHandler = require("../middleware/asyncHandler");
-const { signToken } = require("../utils/tokens");
+const { signToken, signRefreshToken, verifyRefreshToken } = require("../utils/tokens");
 const { serializeBuilding, serializeUser } = require("../utils/serializers");
 
 function makeBuildingCode(name) {
@@ -19,6 +19,7 @@ function authResponse(res, user, building, statusCode = 200) {
   res.status(statusCode).json({
     success: true,
     token: signToken(user),
+    refreshToken: signRefreshToken(user),
     user: serializeUser(user),
     building: serializeBuilding(building)
   });
@@ -160,4 +161,30 @@ const me = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { registerAdmin, registerUser, login, me };
+const refresh = asyncHandler(async (req, res) => {
+  const { refreshToken } = req.body;
+  if (!refreshToken) {
+    res.status(400);
+    throw new Error("Refresh token is required");
+  }
+
+  const decoded = verifyRefreshToken(refreshToken);
+  if (decoded.type !== "refresh") {
+    res.status(401);
+    throw new Error("Invalid refresh token");
+  }
+
+  const user = await User.findById(decoded.id);
+  if (!user) {
+    res.status(401);
+    throw new Error("User not found");
+  }
+
+  res.json({
+    success: true,
+    token: signToken(user),
+    refreshToken: signRefreshToken(user)
+  });
+});
+
+module.exports = { registerAdmin, registerUser, login, me, refresh };
