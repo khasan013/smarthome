@@ -15,18 +15,42 @@ function normalizeStatus(status) {
 }
 
 const listComplaints = asyncHandler(async (req, res) => {
+  const page = Math.max(Number(req.query.page || 1), 1);
+  const limit = Math.min(Math.max(Number(req.query.limit || 15), 1), 50);
+  const skip = (page - 1) * limit;
   const query = { building: req.user.building };
 
   if (req.user.role !== "admin") {
     query.tenant = req.user._id;
+  } else {
+    query.status = { $nin: CLOSED_STATUSES };
   }
 
-  const complaints = await Complaint.find(query).populate("tenant").sort({ createdAt: -1 });
+  const [complaints, total, resolvedHistory] = await Promise.all([
+    Complaint.find(query)
+      .populate("tenant")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    Complaint.countDocuments(query),
+    req.user.role === "admin"
+      ? Complaint.find({ building: req.user.building, status: { $in: CLOSED_STATUSES } })
+          .populate("tenant")
+          .sort({ createdAt: -1 })
+          .limit(25)
+          .lean()
+      : Promise.resolve([])
+  ]);
   const serialized = complaints.map(serializeComplaint);
   res.json({
     success: true,
-    complaints: req.user.role === "admin" ? serialized.filter((item) => !CLOSED_STATUSES.includes(item.status)) : serialized,
-    resolvedHistory: serialized.filter((item) => CLOSED_STATUSES.includes(item.status))
+    complaints: serialized,
+    resolvedHistory: resolvedHistory.map(serializeComplaint),
+    page,
+    limit,
+    total,
+    hasMore: skip + serialized.length < total
   });
 });
 

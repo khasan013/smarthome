@@ -69,5 +69,7 @@ const complaintSchema = new mongoose.Schema(
 
 complaintSchema.index({ building: 1, status: 1, createdAt: -1 });
 complaintSchema.index({ building: 1, tenant: 1, createdAt: -1 });
+complaintSchema.index({ building: 1, status: 1, createdAt: -1, flatNo: 1 });
+complaintSchema.index({ status: 1, createdAt: -1, flatNo: 1 });
 
 module.exports = mongoose.models.Complaint || mongoose.model("Complaint", complaintSchema);
