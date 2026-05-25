@@ -30,6 +30,25 @@ const listFacilities = asyncHandler(async (req, res) => {
   });
 });
 
+const createFacility = asyncHandler(async (req, res) => {
+  const { name, description, price, imageUrl } = req.body;
+  if (!name || !name.trim()) {
+    res.status(400);
+    throw new Error("Facility name is required");
+  }
+
+  const facility = await Facility.create({
+    building: req.user.building,
+    name: name.trim(),
+    description: description || "",
+    price: Number(price) || 0,
+    imageUrl: imageUrl || "",
+    active: true
+  });
+
+  res.status(201).json({ success: true, facility: serializeFacility(facility) });
+});
+
 const createBooking = asyncHandler(async (req, res) => {
   const { facilityId, date, note } = req.body;
   if (!facilityId || !date) {
@@ -74,4 +93,4 @@ const updateBooking = asyncHandler(async (req, res) => {
   res.json({ success: true, booking: serializeBooking(booking) });
 });
 
-module.exports = { listFacilities, createBooking, updateBooking };
+module.exports = { listFacilities, createFacility, createBooking, updateBooking };

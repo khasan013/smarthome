@@ -1,5 +1,6 @@
 const express = require("express");
 const {
+  createFacility,
   createBooking,
   listFacilities,
   updateBooking
@@ -10,6 +11,7 @@ const router = express.Router();
 
 router.use(protect);
 router.get("/", listFacilities);
+router.post("/", adminOnly, createFacility);
 router.post("/bookings", createBooking);
 router.patch("/bookings/:id", adminOnly, updateBooking);
 
