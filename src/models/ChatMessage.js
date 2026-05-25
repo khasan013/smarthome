@@ -5,7 +5,8 @@ const chatMessageSchema = new mongoose.Schema(
     building: { type: mongoose.Schema.Types.ObjectId, ref: "Building", required: true },
     sender: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     recipient: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-    text: { type: String, required: true, trim: true }
+    text: { type: String, trim: true, default: "" },
+    photoUrl: { type: String, default: "" }
   },
   { timestamps: true }
 );

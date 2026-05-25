@@ -140,7 +140,8 @@ function serializeBooking(booking) {
 function serializeChatMessage(message) {
   return {
     id: toId(message._id),
-    text: message.text,
+    text: message.text || "",
+    photoUrl: message.photoUrl || "",
     senderId: toId(message.sender && message.sender._id ? message.sender._id : message.sender),
     senderName: message.sender && message.sender.name ? message.sender.name : "",
     senderRole: message.sender && message.sender.role ? message.sender.role : "",
