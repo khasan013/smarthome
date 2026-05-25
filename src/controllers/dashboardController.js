@@ -4,6 +4,7 @@ const Notice = require("../models/Notice");
 const Notification = require("../models/Notification");
 const Facility = require("../models/Facility");
 const Booking = require("../models/Booking");
+const VisitorRequest = require("../models/VisitorRequest");
 const User = require("../models/User");
 const asyncHandler = require("../middleware/asyncHandler");
 const {
@@ -13,7 +14,8 @@ const {
   serializeBooking,
   serializeFlat,
   serializeNotification,
-  serializeNotice
+  serializeNotice,
+  serializeVisitorRequest
 } = require("../utils/serializers");
 
 const CLOSED_COMPLAINT_STATUSES = ["Resolved", "Rejected", "Completed"];
@@ -28,14 +30,15 @@ const getDashboard = asyncHandler(async (req, res) => {
   const building = req.user.building;
 
   if (req.user.role === "admin") {
-    const [flats, bills, complaints, notices, notifications, facilities, bookings] = await Promise.all([
+    const [flats, bills, complaints, notices, notifications, facilities, bookings, visitors] = await Promise.all([
       User.find({ building, role: "tenant" }).sort({ flatNo: 1 }),
       Bill.find({ building }).sort({ createdAt: -1 }),
       Complaint.find({ building }).populate("tenant").sort({ createdAt: -1 }),
       Notice.find({ building }).sort({ createdAt: -1 }).limit(5),
       Notification.find({ building }).sort({ createdAt: -1 }).limit(20),
       Facility.find({ building }).sort({ name: 1 }),
-      Booking.find({ building }).populate("facility").sort({ createdAt: -1 })
+      Booking.find({ building }).populate("facility").sort({ createdAt: -1 }),
+      VisitorRequest.find({ building }).populate("tenant").sort({ createdAt: -1 }).limit(20)
     ]);
 
     const activeComplaints = complaints.filter((complaint) => !CLOSED_COMPLAINT_STATUSES.includes(complaint.status));
@@ -63,18 +66,20 @@ const getDashboard = asyncHandler(async (req, res) => {
       notices: notices.map(serializeNotice),
       notifications: notifications.map(serializeNotification),
       facilities: facilities.map(serializeFacility),
-      bookings: bookings.map(serializeBooking)
+      bookings: bookings.map(serializeBooking),
+      visitors: visitors.map(serializeVisitorRequest)
     });
     return;
   }
 
-  const [bills, complaints, notices, notifications, facilities, bookings] = await Promise.all([
+  const [bills, complaints, notices, notifications, facilities, bookings, visitors] = await Promise.all([
     Bill.find({ building, tenant: req.user._id }).sort({ createdAt: -1 }),
     Complaint.find({ building, tenant: req.user._id }).populate("tenant").sort({ createdAt: -1 }),
     Notice.find({ building }).sort({ createdAt: -1 }).limit(5),
     Notification.find({ building, $or: [{ user: req.user._id }, { user: null }] }).sort({ createdAt: -1 }).limit(20),
     Facility.find({ building }).sort({ name: 1 }),
-    Booking.find({ building, tenant: req.user._id }).populate("facility").sort({ createdAt: -1 })
+    Booking.find({ building, tenant: req.user._id }).populate("facility").sort({ createdAt: -1 }),
+    VisitorRequest.find({ building, tenant: req.user._id }).populate("tenant").sort({ createdAt: -1 }).limit(20)
   ]);
 
   const currentDue = bills.filter((bill) => !isPaid(bill)).reduce((sum, bill) => sum + billTotal(bill), 0);
@@ -91,7 +96,8 @@ const getDashboard = asyncHandler(async (req, res) => {
     notices: notices.map(serializeNotice),
     notifications: notifications.map(serializeNotification),
     facilities: facilities.map(serializeFacility),
-    bookings: bookings.map(serializeBooking)
+    bookings: bookings.map(serializeBooking),
+    visitors: visitors.map(serializeVisitorRequest)
   });
 });
 
@@ -101,12 +107,24 @@ function escapePdfText(value) {
 
 function createSimplePdf(lines) {
   const content = [
+    "0.84 1 0 RG",
+    "0.84 1 0 rg",
+    "50 760 495 4 re f",
+    "0.10 0.10 0.10 rg",
+    "50 700 495 38 re f",
+    "0.84 1 0 rg",
+    "50 700 8 38 re f",
+    "0 0 0 rg",
     "BT",
-    "/F1 20 Tf",
+    "/F1 24 Tf",
     "50 790 Td",
     `(${escapePdfText(lines[0])}) Tj`,
+    "/F1 14 Tf",
+    "0 -36 Td",
+    `(Premium monthly report) Tj`,
     "/F1 11 Tf",
-    ...lines.slice(1).flatMap((line) => ["0 -22 Td", `(${escapePdfText(line)}) Tj`]),
+    "20 -65 Td",
+    ...lines.slice(1).flatMap((line) => ["0 -24 Td", `(${escapePdfText(line)}) Tj`]),
     "ET"
   ].join("\n");
   const objects = [

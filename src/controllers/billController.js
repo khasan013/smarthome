@@ -149,12 +149,24 @@ function escapePdfText(value) {
 
 function createSimplePdf(lines) {
   const content = [
+    "0.84 1 0 RG",
+    "0.84 1 0 rg",
+    "50 760 495 4 re f",
+    "0.10 0.10 0.10 rg",
+    "50 700 495 38 re f",
+    "0.84 1 0 rg",
+    "50 700 8 38 re f",
+    "0 0 0 rg",
     "BT",
-    "/F1 20 Tf",
+    "/F1 24 Tf",
     "50 790 Td",
     `(${escapePdfText(lines[0])}) Tj`,
+    "/F1 14 Tf",
+    "0 -36 Td",
+    `(Premium digital copy) Tj`,
     "/F1 11 Tf",
-    ...lines.slice(1).flatMap((line) => ["0 -22 Td", `(${escapePdfText(line)}) Tj`]),
+    "20 -65 Td",
+    ...lines.slice(1).flatMap((line) => ["0 -24 Td", `(${escapePdfText(line)}) Tj`]),
     "ET"
   ].join("\n");
   const objects = [
@@ -198,6 +210,7 @@ const downloadBill = asyncHandler(async (req, res) => {
     `Invoice ID: ${bill.invoiceId || bill._id}`,
     `Resident: ${bill.tenant ? bill.tenant.name : ""}`,
     `Flat: ${bill.flatNo}`,
+    `Prepaid meter: ${bill.tenant ? bill.tenant.meterNumber || "Not set" : "Not set"}`,
     `Month: ${bill.month}`,
     `Rent: Tk ${bill.rent}`,
     `Electricity: Tk ${bill.electricity}`,

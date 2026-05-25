@@ -11,6 +11,7 @@ function serializeUser(user) {
     role: user.role,
     flatNo: user.flatNo || "",
     rent: user.rent || 0,
+    meterNumber: user.meterNumber || "",
     status: user.status,
     building: toId(user.building),
     profilePhoto: user.profilePhoto || "",
@@ -43,6 +44,7 @@ function serializeFlat(user) {
     flatNo: user.flatNo || "",
     status: user.status,
     rent: user.rent || 0,
+    meterNumber: user.meterNumber || "",
     joinDate: user.createdAt ? user.createdAt.toISOString() : null
   };
 }
@@ -135,6 +137,34 @@ function serializeBooking(booking) {
   };
 }
 
+function serializeChatMessage(message) {
+  return {
+    id: toId(message._id),
+    text: message.text,
+    senderId: toId(message.sender && message.sender._id ? message.sender._id : message.sender),
+    senderName: message.sender && message.sender.name ? message.sender.name : "",
+    senderRole: message.sender && message.sender.role ? message.sender.role : "",
+    recipientId: toId(message.recipient && message.recipient._id ? message.recipient._id : message.recipient),
+    recipientName: message.recipient && message.recipient.name ? message.recipient.name : "",
+    createdAt: message.createdAt ? message.createdAt.toISOString() : null
+  };
+}
+
+function serializeVisitorRequest(visitor) {
+  return {
+    id: toId(visitor._id),
+    tenant: toId(visitor.tenant && visitor.tenant._id ? visitor.tenant._id : visitor.tenant),
+    tenantName: visitor.tenant && visitor.tenant.name ? visitor.tenant.name : "",
+    flatNo: visitor.tenant && visitor.tenant.flatNo ? visitor.tenant.flatNo : "",
+    visitorName: visitor.visitorName,
+    phone: visitor.phone || "",
+    purpose: visitor.purpose || "",
+    visitDate: visitor.visitDate || "",
+    status: visitor.status,
+    createdAt: visitor.createdAt ? visitor.createdAt.toISOString() : null
+  };
+}
+
 module.exports = {
   serializeUser,
   serializeBuilding,
@@ -144,5 +174,7 @@ module.exports = {
   serializeComplaint,
   serializeNotification,
   serializeFacility,
-  serializeBooking
+  serializeBooking,
+  serializeChatMessage,
+  serializeVisitorRequest
 };

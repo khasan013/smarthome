@@ -33,6 +33,7 @@ const createFlat = asyncHandler(async (req, res) => {
     email: req.body.email,
     flatNo,
     rent,
+    meterNumber: req.body.meterNumber || "",
     password,
     role: "tenant",
     building: req.user.building,
@@ -54,7 +55,7 @@ const updateFlat = asyncHandler(async (req, res) => {
     throw new Error("Flat was not found");
   }
 
-  ["name", "phone", "flatNo", "status"].forEach((field) => {
+  ["name", "phone", "flatNo", "status", "meterNumber"].forEach((field) => {
     if (req.body[field] !== undefined) {
       flat[field] = req.body[field];
     }

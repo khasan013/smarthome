@@ -10,6 +10,8 @@ const billRoutes = require("./routes/billRoutes");
 const complaintRoutes = require("./routes/complaintRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const facilityRoutes = require("./routes/facilityRoutes");
+const chatRoutes = require("./routes/chatRoutes");
+const visitorRoutes = require("./routes/visitorRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const profileRoutes = require("./routes/profileRoutes");
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
@@ -52,6 +54,8 @@ app.use("/api/bills", billRoutes);
 app.use("/api/complaints", complaintRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/facilities", facilityRoutes);
+app.use("/api/chat", chatRoutes);
+app.use("/api/visitors", visitorRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/profile", profileRoutes);
 
