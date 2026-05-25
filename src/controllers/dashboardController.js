@@ -7,6 +7,7 @@ const Booking = require("../models/Booking");
 const VisitorRequest = require("../models/VisitorRequest");
 const User = require("../models/User");
 const asyncHandler = require("../middleware/asyncHandler");
+const { createReportPdf } = require("../utils/premiumPdf");
 const {
   serializeBill,
   serializeComplaint,
@@ -101,54 +102,6 @@ const getDashboard = asyncHandler(async (req, res) => {
   });
 });
 
-function escapePdfText(value) {
-  return String(value ?? "").replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
-}
-
-function createSimplePdf(lines) {
-  const content = [
-    "0.84 1 0 RG",
-    "0.84 1 0 rg",
-    "50 760 495 4 re f",
-    "0.10 0.10 0.10 rg",
-    "50 700 495 38 re f",
-    "0.84 1 0 rg",
-    "50 700 8 38 re f",
-    "0 0 0 rg",
-    "BT",
-    "/F1 24 Tf",
-    "50 790 Td",
-    `(${escapePdfText(lines[0])}) Tj`,
-    "/F1 14 Tf",
-    "0 -36 Td",
-    `(Premium monthly report) Tj`,
-    "/F1 11 Tf",
-    "20 -65 Td",
-    ...lines.slice(1).flatMap((line) => ["0 -24 Td", `(${escapePdfText(line)}) Tj`]),
-    "ET"
-  ].join("\n");
-  const objects = [
-    "<< /Type /Catalog /Pages 2 0 R >>",
-    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
-    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-    `<< /Length ${Buffer.byteLength(content)} >>\nstream\n${content}\nendstream`
-  ];
-  let pdf = "%PDF-1.4\n";
-  const offsets = [0];
-  objects.forEach((object, index) => {
-    offsets.push(Buffer.byteLength(pdf));
-    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
-  });
-  const xref = Buffer.byteLength(pdf);
-  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-  offsets.slice(1).forEach((offset) => {
-    pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
-  });
-  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
-  return Buffer.from(pdf);
-}
-
 const downloadMonthlyReport = asyncHandler(async (req, res) => {
   const building = req.user.building;
   const [flats, bills] = await Promise.all([
@@ -159,16 +112,16 @@ const downloadMonthlyReport = asyncHandler(async (req, res) => {
   const unpaidBills = bills.filter((bill) => !isPaid(bill));
   const collected = paidBills.reduce((sum, bill) => sum + billTotal(bill), 0);
   const pending = unpaidBills.reduce((sum, bill) => sum + billTotal(bill), 0);
-  const pdf = createSimplePdf([
-    "Smart Building Monthly Report",
-    `Collected amount: Tk ${collected}`,
-    `Pending amount: Tk ${pending}`,
-    `Paid users: ${new Set(paidBills.map((bill) => bill.tenant.toString())).size}`,
-    `Unpaid users: ${new Set(unpaidBills.map((bill) => bill.tenant.toString())).size}`,
-    `Bills count: ${bills.length}`,
-    `Residents: ${flats.length}`,
-    `Generated: ${new Date().toISOString()}`
-  ]);
+  const pdf = createReportPdf({
+    title: "Smart Building Monthly Report",
+    collected,
+    pending,
+    paidUsers: new Set(paidBills.map((bill) => bill.tenant.toString())).size,
+    unpaidUsers: new Set(unpaidBills.map((bill) => bill.tenant.toString())).size,
+    billsCount: bills.length,
+    residents: flats.length,
+    generatedAt: new Date().toISOString()
+  });
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", "attachment; filename=\"monthly-report.pdf\"");
   res.send(pdf);
