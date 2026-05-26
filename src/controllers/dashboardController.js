@@ -21,6 +21,8 @@ const {
 } = require("../utils/serializers");
 
 const CLOSED_COMPLAINT_STATUSES = ["Resolved", "Rejected", "Completed"];
+const NOTICE_RETENTION_MS = 1000 * 60 * 60 * 24 * 7;
+const NOTIFICATION_RETENTION_MS = 1000 * 60 * 60 * 24 * 15;
 function billTotal(bill) {
   return (bill.rent || 0) + (bill.serviceCharge || 0) + (bill.electricity || 0) + (bill.gas || 0) + (bill.water || 0) + (bill.otherCosts || 0);
 }
@@ -30,14 +32,16 @@ function isPaid(bill) {
 
 const getDashboard = asyncHandler(async (req, res) => {
   const building = req.user.building;
+  const noticeCutoff = new Date(Date.now() - NOTICE_RETENTION_MS);
+  const notificationCutoff = new Date(Date.now() - NOTIFICATION_RETENTION_MS);
 
   if (req.user.role === "admin") {
     const [flats, bills, complaints, notices, notifications, facilities, bookings, visitors] = await Promise.all([
       User.find({ building, role: "tenant" }).sort({ flatNo: 1 }),
       Bill.find({ building }).sort({ createdAt: -1 }),
       Complaint.find({ building }).populate("tenant").sort({ createdAt: -1 }),
-      Notice.find({ building }).sort({ createdAt: -1 }).limit(5),
-      Notification.find({ building }).sort({ createdAt: -1 }).limit(20),
+      Notice.find({ building, createdAt: { $gte: noticeCutoff } }).sort({ createdAt: -1 }).limit(5),
+      Notification.find({ building, createdAt: { $gte: notificationCutoff } }).sort({ createdAt: -1 }).limit(20),
       Facility.find({ building }).sort({ name: 1 }),
       Booking.find({ building }).populate("facility").sort({ createdAt: -1 }),
       VisitorRequest.find({ building }).populate("tenant").sort({ createdAt: -1 }).limit(20)
@@ -77,8 +81,8 @@ const getDashboard = asyncHandler(async (req, res) => {
   const [bills, complaints, notices, notifications, facilities, bookings, visitors] = await Promise.all([
     Bill.find({ building, tenant: req.user._id }).sort({ createdAt: -1 }),
     Complaint.find({ building, tenant: req.user._id }).populate("tenant").sort({ createdAt: -1 }),
-    Notice.find({ building }).sort({ createdAt: -1 }).limit(5),
-    Notification.find({ building, $or: [{ user: req.user._id }, { user: null }] }).sort({ createdAt: -1 }).limit(20),
+    Notice.find({ building, createdAt: { $gte: noticeCutoff } }).sort({ createdAt: -1 }).limit(5),
+    Notification.find({ building, createdAt: { $gte: notificationCutoff }, $or: [{ user: req.user._id }, { user: null }] }).sort({ createdAt: -1 }).limit(20),
     Facility.find({ building }).sort({ name: 1 }),
     Booking.find({ building, tenant: req.user._id }).populate("facility").sort({ createdAt: -1 }),
     VisitorRequest.find({ building, tenant: req.user._id }).populate("tenant").sort({ createdAt: -1 }).limit(20)

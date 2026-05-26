@@ -1,6 +1,7 @@
 const Booking = require("../models/Booking");
 const Facility = require("../models/Facility");
 const Notification = require("../models/Notification");
+const User = require("../models/User");
 const asyncHandler = require("../middleware/asyncHandler");
 const { serializeBooking, serializeFacility } = require("../utils/serializers");
 
@@ -45,6 +46,23 @@ const createFacility = asyncHandler(async (req, res) => {
     imageUrl: imageUrl || "",
     active: true
   });
+
+  const tenants = await User.find({
+    building: req.user.building,
+    role: "tenant",
+    status: { $in: ["approved", "Active"] }
+  }).select("_id");
+  if (tenants.length > 0) {
+    await Notification.insertMany(
+      tenants.map((tenant) => ({
+        building: req.user.building,
+        user: tenant._id,
+        title: "Facility updated",
+        message: `${facility.name} is now available.`,
+        type: "announcement"
+      }))
+    );
+  }
 
   res.status(201).json({ success: true, facility: serializeFacility(facility) });
 });

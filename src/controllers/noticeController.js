@@ -1,9 +1,16 @@
 const Notice = require("../models/Notice");
+const Notification = require("../models/Notification");
+const User = require("../models/User");
 const asyncHandler = require("../middleware/asyncHandler");
 const { serializeNotice } = require("../utils/serializers");
 
+const NOTICE_RETENTION_MS = 1000 * 60 * 60 * 24 * 7;
+
 const listNotices = asyncHandler(async (req, res) => {
-  const notices = await Notice.find({ building: req.user.building }).sort({ createdAt: -1 });
+  const notices = await Notice.find({
+    building: req.user.building,
+    createdAt: { $gte: new Date(Date.now() - NOTICE_RETENTION_MS) }
+  }).sort({ createdAt: -1 });
   res.json({ success: true, notices: notices.map(serializeNotice) });
 });
 
@@ -22,6 +29,23 @@ const createNotice = asyncHandler(async (req, res) => {
     date: req.body.date,
     createdBy: req.user._id
   });
+
+  const tenants = await User.find({
+    building: req.user.building,
+    role: "tenant",
+    status: { $in: ["approved", "Active"] }
+  }).select("_id");
+  if (tenants.length > 0) {
+    await Notification.insertMany(
+      tenants.map((tenant) => ({
+        building: req.user.building,
+        user: tenant._id,
+        title: title.trim(),
+        message: description.trim(),
+        type: "announcement"
+      }))
+    );
+  }
 
   res.status(201).json({ success: true, notice: serializeNotice(notice) });
 });

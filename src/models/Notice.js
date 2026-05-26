@@ -30,5 +30,6 @@ const noticeSchema = new mongoose.Schema(
 );
 
 noticeSchema.index({ building: 1, createdAt: -1 });
+noticeSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 7 });
 
 module.exports = mongoose.models.Notice || mongoose.model("Notice", noticeSchema);

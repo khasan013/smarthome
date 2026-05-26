@@ -55,6 +55,9 @@ const updateFlat = asyncHandler(async (req, res) => {
     throw new Error("Flat was not found");
   }
 
+  const previousStatus = flat.status;
+  const previousRent = flat.rent;
+
   ["name", "phone", "flatNo", "status", "meterNumber"].forEach((field) => {
     if (req.body[field] !== undefined) {
       flat[field] = req.body[field];
@@ -67,7 +70,17 @@ const updateFlat = asyncHandler(async (req, res) => {
 
   await flat.save();
 
-  if (req.body.status === "approved" || req.body.status === "Active") {
+  if (req.body.rent !== undefined && Number(req.body.rent) !== Number(previousRent)) {
+    await Notification.create({
+      building: req.user.building,
+      user: flat._id,
+      title: "Rent updated",
+      message: `Your monthly rent is now Tk ${flat.rent}.`,
+      type: "announcement"
+    });
+  }
+
+  if ((req.body.status === "approved" || req.body.status === "Active") && previousStatus !== req.body.status) {
     await Notification.create({
       building: req.user.building,
       user: flat._id,
@@ -76,7 +89,7 @@ const updateFlat = asyncHandler(async (req, res) => {
       type: "approval"
     });
   }
-  if (req.body.status === "rejected") {
+  if (req.body.status === "rejected" && previousStatus !== req.body.status) {
     await Notification.create({
       building: req.user.building,
       user: flat._id,
